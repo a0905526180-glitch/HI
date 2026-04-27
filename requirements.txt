@@ -1,8 +1,6 @@
-streamlit
-yfinance
-pandas
-pandas_ta
-numpy
-plotly
-scipy
-requests
+streamlit==1.33.0
+pandas==2.1.4
+numpy==1.26.4
+requests==2.31.0
+yfinance==0.2.37
+pandas-ta==0.3.14b0
