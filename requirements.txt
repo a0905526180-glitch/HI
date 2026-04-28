@@ -4,3 +4,4 @@ numpy
 requests
 yfinance
 pandas-ta
+twstock
