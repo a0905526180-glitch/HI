@@ -476,6 +476,57 @@ with tab_portfolio:
             
     st.dataframe(pd.DataFrame(status_list), use_container_width=True)
 
-with tab_history:
-    st.markdown("### 📊 SQLite 歷史訊號覆盤")
-    st.info("系統會自動記錄每日盤後雷達的訊號，以供未來統計各項技術與籌碼策略的真實勝率。")
+# --- 歷史回測資料庫區塊 ---
+with tab_history:  # 請確認變數名稱與你的 tabs 定義一致
+    st.markdown("## 📚 歷史訊號覆盤與追蹤")
+    st.caption("查看過去雷達掃描所捕捉到的潛力標的，驗證策略勝率並追蹤後續走勢。")
+
+    # 載入歷史資料
+    df_history = load_history_data()
+
+    if df_history.empty:
+        st.info("📭 目前資料庫中尚無歷史訊號紀錄。請先到「全市場策略雷達」執行掃描，系統會自動將符合條件的標的存入這裡！")
+    else:
+        # 實用功能 1：動態過濾器 (利用 columns 並排顯示)
+        col1, col2 = st.columns(2)
+        with col1:
+            date_list = ["全部"] + list(df_history['scan_date'].unique())
+            filter_date = st.selectbox("📅 選擇掃描日期", date_list)
+        with col2:
+            strategy_list = ["全部"] + list(df_history['strategy'].unique())
+            filter_strategy = st.selectbox("🎯 選擇觸發策略", strategy_list)
+
+        # 實用功能 2：資料篩選邏輯
+        df_display = df_history.copy()
+        if filter_date != "全部":
+            df_display = df_display[df_display['scan_date'] == filter_date]
+        if filter_strategy != "全部":
+            df_display = df_display[df_display['strategy'] == filter_strategy]
+
+        # 顯示統計資訊
+        st.write(f"🔍 篩選結果：共找到 **{len(df_display)}** 筆紀錄")
+
+        # 實用功能 3：美化資料表顯示 (使用 column_config 讓數字和欄位更漂亮)
+        st.dataframe(
+            df_display,
+            column_config={
+                "scan_date": "掃描日期",
+                "ticker": "股票代號",
+                "close_price": st.column_config.NumberColumn("觸發時股價", format="%.2f 元"),
+                "strategy": "觸發策略",
+                "tech_status": "技術面狀態",
+                "chip_status": "籌碼面狀態"
+            },
+            use_container_width=True,
+            hide_index=True,
+            height=400
+        )
+
+        # 實用功能 4：一鍵匯出 CSV (加入 utf-8-sig 確保 Excel 打開中文不會亂碼)
+        csv = df_display.to_csv(index=False).encode('utf-8-sig')
+        st.download_button(
+            label="📥 下載目前篩選的歷史訊號 (CSV Excel 格式)",
+            data=csv,
+            file_name=f"TITAN_歷史訊號_{filter_date}.csv",
+            mime="text/csv",
+        )
