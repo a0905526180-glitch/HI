@@ -32,7 +32,18 @@ def init_dbs():
     conn_cache.close()
 
 init_dbs()
-
+def load_history_data():
+    """從 SQLite 讀取歷史掃描訊號"""
+    conn = sqlite3.connect('titan_history.db')
+    try:
+        # 依照日期由新到舊排序撈出所有資料
+        df = pd.read_sql_query("SELECT * FROM signal_history ORDER BY scan_date DESC", conn)
+    except Exception:
+        # 如果資料表還不存在或有錯誤，回傳空表格防呆
+        df = pd.DataFrame()
+    finally:
+        conn.close()
+    return df
 # ==========================================
 # 2. 數據獲取引擎 (Data Engine - 真正全市場)
 # ==========================================
