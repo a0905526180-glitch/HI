@@ -32,6 +32,7 @@ def init_dbs():
     conn_cache.close()
 
 init_dbs()
+
 def load_history_data():
     """從 SQLite 讀取歷史掃描訊號"""
     conn = sqlite3.connect('titan_history.db')
@@ -44,6 +45,29 @@ def load_history_data():
     finally:
         conn.close()
     return df
+
+def save_signal_to_db(ticker, price, strategy, tech_msg, chip_data):
+    """將觸發訊號的標的存入 SQLite 歷史庫"""
+    conn = sqlite3.connect('titan_history.db')
+    cursor = conn.cursor()
+    
+    # 格式化今天的日期
+    scan_date = datetime.datetime.now().strftime("%Y-%m-%d")
+    
+    # 整合籌碼狀態字串
+    chip_status = f"外資5日:{chip_data['外資近5日(張)']} | 投信連買:{chip_data['投信連買(天)']}d"
+    
+    try:
+        cursor.execute("""
+            INSERT INTO signal_history (scan_date, ticker, close_price, strategy, tech_status, chip_status)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (scan_date, ticker, price, strategy, tech_msg, chip_status))
+        conn.commit()
+    except Exception as e:
+        print(f"資料庫寫入失敗: {e}")
+    finally:
+        conn.close()
+
 # ==========================================
 # 2. 數據獲取引擎 (Data Engine - 真正全市場)
 # ==========================================
@@ -179,6 +203,7 @@ def get_finmind_data(ticker):
         "即時報價": rt_price,
         "昨日收盤": prev_close
     }
+
 # ==========================================
 # 3. 核心技術指標與策略運算 (Technical Engine)
 # ==========================================
@@ -444,6 +469,12 @@ with tab_radar:
                     is_match, reason = evaluate_strategy(df, strategy)
                     if is_match:
                         chip = get_finmind_data(ticker)
+                        
+                        # --- 🚀 關鍵修復：把抓到的股票寫入歷史資料庫 ---
+                        current_price = chip.get('即時報價', df['Close'].iloc[-1])
+                        save_signal_to_db(ticker, current_price, strategy, reason, chip)
+                        # ---------------------------------------------
+                        
                         results.append({"股票代號": ticker, "收盤價": round(df['Close'].iloc[-1], 2), 
                                         "觸發原因": reason, "投信連買(天)": chip['投信連買(天)']})
                 
@@ -453,7 +484,7 @@ with tab_radar:
                 
         if results:
             df_res = pd.DataFrame(results)
-            st.success(f"掃描完成！共發現 {len(df_res)} 檔符合策略的潛力標的。")
+            st.success(f"掃描完成！共發現 {len(df_res)} 檔符合策略的潛力標的，已同步存入歷史庫。")
             st.dataframe(df_res, use_container_width=True)
         else:
             st.warning("今日全市場無符合該策略條件之標的。")
